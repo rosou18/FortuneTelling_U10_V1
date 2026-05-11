@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fortune Teller</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Rye&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;background:#000;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:none;touch-action:manipulation;}
+
+/* pages */
+.pg{position:fixed;inset:0;opacity:0;pointer-events:none;transition:opacity .8s ease;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.pg.on{opacity:1;pointer-events:all;}
+
+/* ══ LANDING — three.js canvas fills it ══ */
+#p0{background:#000;}
+#three-canvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;}
+
+.lnd-over{
+  position:relative;z-index:2;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:space-between;height:100%;
+  padding:52px 40px 72px;text-align:center;
+  pointer-events:none;
+}
+.lnd-top{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.lnd-eyebrow{
+  font-family:'Cinzel',serif;
+  font-size:clamp(7px,1.6vw,9px);letter-spacing:.3em;text-transform:uppercase;
+  color:rgba(255,255,255,.4);
+}
+.lnd-title{
+  font-family:'Cinzel',serif;font-weight:700;
+  font-size:clamp(28px,8vw,56px);
+  color:#fff;line-height:1.1;letter-spacing:.12em;text-transform:none;
+  text-shadow:0 0 40px rgba(255,255,255,.15),0 2px 20px rgba(0,0,0,.9);
+}
+.lnd-rule{width:48px;height:1px;background:rgba(255,255,255,.25);margin:8px auto 0;}
+/* spacer — moon lives here */
+
+/* bottom block */
+.lnd-spacer{flex:1;}
+.lnd-bottom{display:flex;flex-direction:column;align-items:center;gap:16px;}
+.lnd-sub{
+  font-family:'Cinzel',serif;
+  font-size:clamp(9px,2vw,12px);letter-spacing:.2em;
+  color:rgba(255,255,255,.45);font-style:italic;
+}
+.lnd-btn{
+  pointer-events:all;
+  font-family:'Cinzel',serif;font-weight:600;
+  font-size:clamp(11px,2.5vw,14px);letter-spacing:.28em;text-transform:uppercase;
+  color:#fff;background:transparent;
+  border:1px solid rgba(255,255,255,.3);
+  padding:16px 64px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  transition:border-color .25s;
+}
+.lnd-press{font-family:'Cinzel',serif;font-size:clamp(8px,1.8vw,10px);letter-spacing:.28em;text-transform:uppercase;color:rgba(255,255,255,.2);margin-bottom:8px;}
+.lnd-btn:hover{border-color:rgba(255,255,255,.7);}
+.lnd-btn:active{opacity:.6;}
+
+/* ══ QUESTIONS ══ */
+#p2{background:transparent;flex-direction:column;justify-content:flex-start;}
+
+.q-topimg{
+  width:100%;max-height:200px;
+  object-fit:contain;object-position:center;display:block;flex-shrink:0;
+  position:relative;z-index:2;
+}
+
+.q-stage{
+  flex:1;width:100%;position:relative;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;z-index:2;
+}
+.q-bk{
+  position:fixed;top:14px;left:16px;z-index:30;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);
+  font-family:'Cinzel',serif;font-size:8px;letter-spacing:.14em;
+  text-transform:uppercase;padding:6px 10px;
+  background:transparent;border:1px solid rgba(255,255,255,.12);
+  color:rgba(255,255,255,.3);cursor:pointer;-webkit-tap-highlight-color:transparent;
+}
+
+/* question frame */
+.q-frame{
+  position:absolute;
+  width:calc(100% - 80px);max-width:440px;
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+}
+.q-frame.enter{animation:qIn .5s cubic-bezier(0.16,1,0.3,1) forwards;}
+.q-frame.exit{animation:qOut .25s ease forwards;}
+@keyframes qIn{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+@keyframes qOut{from{opacity:1;}to{opacity:0;}}
+
+/* small label above question */
+.q-label{
+  font-family:'Cinzel',serif;font-weight:400;
+  font-size:8px;letter-spacing:.38em;text-transform:uppercase;
+  color:rgba(255,255,255,.22);margin-bottom:14px;
+}
+
+/* question — large, clear, not italic */
+.q-q{
+  font-family:'Cinzel',serif;font-weight:600;
+  font-size:clamp(20px,3.5vw,36px);
+  color:#fff;line-height:1.3;margin-bottom:40px;
+  letter-spacing:.04em;text-transform:none;
+}
+
+/* binary — side by side, clear, high quality */
+.q-divider{display:none;}
+.q-binary{
+  display:flex;flex-direction:row;width:100%;gap:0;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:6px;overflow:hidden;
+}
+.q-opt{
+  flex:1;padding:28px 12px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  background:transparent;
+  transition:background .18s,transform .1s;
+  -webkit-tap-highlight-color:transparent;
+  position:relative;
+}
+.q-opt:first-child{
+  border-right:1px solid rgba(255,255,255,.14);
+}
+.q-opt:not(.locked):hover{background:rgba(255,255,255,.05);}
+.q-opt:active{transform:scale(.97);background:rgba(255,255,255,.1);}
+
+/* selected A — red */
+.q-opt.sel-r{background:rgba(176,26,46,.28);}
+/* selected B — white tint */
+.q-opt.sel-w{background:rgba(255,255,255,.1);}
+
+/* unselected fades after choice */
+.q-opt.locked:not(.sel-r):not(.sel-w){opacity:.22;}
+
+.q-opt.locked{pointer-events:none;}
+.q-opt-suit{display:none;}
+
+/* option label */
+.q-opt-l{
+  font-family:'Cinzel',serif;font-weight:600;
+  font-size:clamp(14px,2.6vw,19px);
+  color:#fff;letter-spacing:.06em;text-transform:none;
+  line-height:1.25;text-align:center;
+}
+.q-opt::before{display:none;}
+
+/* ══ COOKIE ══ */
+#p-cookie{background:#d40000;flex-direction:column;}
+#p-cookie .bg{position:absolute;inset:0;background:#d40000;z-index:0;}
+.c-img{width:min(280px,70vw);height:min(280px,70vw);object-fit:contain;display:block;position:relative;z-index:1;}
+.c-txt{
+  font-family:'Cinzel',serif;
+  font-size:clamp(16px,4.5vw,24px);
+  letter-spacing:.08em;font-weight:400;font-style:italic;
+  text-transform:none;
+  color:rgba(255,255,255,.85);margin-top:36px;
+  animation:pulse 2s ease-in-out infinite;
+  position:relative;z-index:1;
+}
+@keyframes pulse{0%,100%{opacity:.3;}50%{opacity:1;}}
+
+/* ══ FORTUNE ══ */
+#p-fortune{background:#000;flex-direction:column;overflow-y:auto;justify-content:flex-start;}
+.f-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  padding:40px 24px 80px;width:100%;
+}
+.f-card{
+  width:100%;max-width:280px;
+  border-radius:14px;overflow:hidden;
+  box-shadow:0 12px 60px rgba(0,0,0,.8);
+  margin-bottom:28px;background:#111;
+}
+.f-img-wrap{width:100%;aspect-ratio:3/4;position:relative;overflow:hidden;}
+.f-img{width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .8s ease;}
+.f-img.on{opacity:1;}
+.f-stats{
+  display:flex;flex-direction:column;align-items:center;
+  gap:8px;max-width:280px;width:100%;text-align:center;
+}
+/* fortune end hierarchy */
+.f-num{font-family:'Space Mono',monospace;font-size:7px;letter-spacing:.2em;color:rgba(255,255,255,.18);margin-bottom:16px;display:block;}
+.f-ty{
+  font-family:'Cinzel',serif;font-weight:700;
+  font-size:clamp(20px,5.5vw,30px);
+  color:#fff;letter-spacing:.08em;text-transform:none;
+  line-height:1.1;margin-bottom:2px;
+}
+.f-ty-sub{
+  font-family:'Cinzel',serif;font-weight:400;font-style:italic;
+  font-size:clamp(12px,3vw,16px);
+  color:rgba(255,255,255,.45);letter-spacing:.06em;text-transform:none;
+  margin-bottom:20px;
+}
+.f-rule{width:32px;height:1px;background:rgba(255,255,255,.15);margin:0 auto 16px;}
+.f-total{
+  font-family:'Space Mono',monospace;
+  font-size:clamp(9px,2vw,11px);letter-spacing:.12em;
+  color:rgba(255,255,255,.35);margin-bottom:4px;text-transform:none;
+}
+.f-total b{color:rgba(255,255,255,.7);font-weight:400;}
+.f-pct{
+  font-family:'Space Mono',monospace;
+  font-size:clamp(9px,2vw,11px);letter-spacing:.1em;
+  color:rgba(255,255,255,.25);text-transform:none;
+}
+.f-pct b{color:#B01A2E;}
+</style>
+</head>
+<body>
+
+<!-- LANDING -->
+<div class="pg on" id="p0">
+  <canvas id="three-canvas"></canvas>
+  <div class="lnd-over">
+    <div class="lnd-top">
+      <div class="lnd-eyebrow">Rose Kessler · Graduation Show · Central Saint Martins</div>
+      <div class="lnd-title">Fortune Teller</div>
+      <div class="lnd-rule"></div>
+    </div>
+    <div class="lnd-spacer"></div>
+    <div class="lnd-bottom">
+      <div class="lnd-sub">Take what you need, not what you want</div>
+      <button class="lnd-btn" id="btn-enter">Enter</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUESTIONS -->
+<div class="pg" id="p2">
+  <button class="q-bk hidden" id="qbk">← Back</button>
+  <img class="q-topimg" src="images/intro_enter.jpg" alt="">
+  <div class="q-stage" id="qstage"></div>
+</div>
+
+<!-- COOKIE -->
+<div class="pg" id="p-cookie">
+  <div class="bg"></div>
+  <img class="c-img" id="c-img" src="images/cookie1.jpg" alt="">
+  <div class="c-txt">Your fortune is loading…</div>
+</div>
+
+<!-- FORTUNE -->
+<div class="pg" id="p-fortune">
+  <div class="f-wrap">
+    <div class="f-card">
+      <div class="f-img-wrap">
+        <img class="f-img" id="f-img" src="" alt="">
+      </div>
+    </div>
+    <div class="f-stats">
+      <div class="f-num" id="f-num"></div>
+      <div class="f-ty">Thank you</div>
+      <div class="f-ty-sub">take your wisdom</div>
+      <div class="f-rule"></div>
+      <div class="f-total" id="f-total"></div>
+      <div class="f-pct"   id="f-pct"></div>
+    </div>
+  </div>
+</div>
+
+<!-- THREE.JS -->
+<script type="module">
+import * as THREE from "https://esm.sh/three@0.157.0";
+import{OrbitControls}from"https://esm.sh/three@0.157.0/addons/controls/OrbitControls.js";
+
+const canvas=document.getElementById('three-canvas');
+const W=()=>window.innerWidth,H=()=>window.innerHeight;
+
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(W(),H());
+
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(75,W()/H(),0.1,1000);
+camera.position.z=5;
+
+const controls=new OrbitControls(camera,canvas);
+controls.enableZoom=false;
+controls.enablePan=false;
+controls.enableDamping=true;
+controls.dampingFactor=0.08;
+controls.rotateSpeed=0.4;
+
+// lights — same as reference code
+// Strong side light for dramatic moon shading
+const dirLight=new THREE.DirectionalLight(0xffffff,2.2);
+dirLight.position.set(-5,3,2);
+scene.add(dirLight);
+// Very dim fill so dark side isn't pitch black
+const fillLight=new THREE.DirectionalLight(0x334466,0.3);
+fillLight.position.set(5,-2,-3);
+scene.add(fillLight);
+const ambLight=new THREE.AmbientLight(0x111122,0.4);
+scene.add(ambLight);
+
+const tl=new THREE.TextureLoader();
+
+// moon — textured with displacement
+const moon=new THREE.Mesh(
+  new THREE.SphereGeometry(1.4,60,60),
+  new THREE.MeshPhongMaterial({
+    color:0xffffff,
+    map:tl.load('https://s3-us-west-2.amazonaws.com/s.cdpn.io/17271/lroc_color_poles_1k.jpg'),
+    displacementMap:tl.load('https://s3-us-west-2.amazonaws.com/s.cdpn.io/17271/ldem_3_8bit.jpg'),
+    displacementScale:0.06,
+    bumpMap:tl.load('https://s3-us-west-2.amazonaws.com/s.cdpn.io/17271/ldem_3_8bit.jpg'),
+    bumpScale:0.04,
+    reflectivity:0,
+    shininess:0
+  })
+);
+moon.rotation.x=Math.PI*0.02;
+moon.rotation.y=Math.PI*1.54;
+scene.add(moon);
+
+// stars as named object for counter-rotation
+// Two star layers — tiny distant + slightly larger close
+const mkStars=(n,size,op)=>{
+  const g=new THREE.BufferGeometry();
+  const v=[];
+  for(let i=0;i<n;i++) v.push((Math.random()-.5)*800,(Math.random()-.5)*800,(Math.random()-.5)*800);
+  g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+  return new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size,transparent:true,opacity:op}));
+};
+const starsSmall=mkStars(18000,.2,.75);
+const starsBig=mkStars(3000,.55,.55);
+const starsGroup=new THREE.Group();
+starsGroup.add(starsSmall,starsBig);
+scene.add(starsGroup);
+const stars=starsGroup;
+
+window.addEventListener('resize',()=>{
+  camera.aspect=W()/H();camera.updateProjectionMatrix();
+  renderer.setSize(W(),H());
+});
+
+let running=true;
+function animate(){
+  if(!running)return;
+  requestAnimationFrame(animate);
+  controls.update();
+  moon.rotation.y+=0.001;
+  moon.rotation.x+=0.00003;
+  // stars drift counter to moon — slow, opposite direction
+  stars.rotation.y-=0.0008;
+  stars.rotation.x+=0.0003;
+  renderer.render(scene,camera);
+}
+animate();
+window._stopThree=()=>{running=false;};
+</script>
+
+<!-- FIREBASE + APP -->
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getFirestore,doc,getDoc,setDoc,increment,collection,addDoc,serverTimestamp}
+  from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app=initializeApp({
+  apiKey:"AIzaSyB3R_s3DQkam2d9Dk_AXtp6dmPi7wxwX6g",
+  authDomain:"fortunes-3747a.firebaseapp.com",
+  projectId:"fortunes-3747a",
+  storageBucket:"fortunes-3747a.firebasestorage.app",
+  messagingSenderId:"688657577579",
+  appId:"1:688657577579:web:98f96e46a9296dcd3a632e"
+});
+const db=getFirestore(app);
+
+async function getTotal(){try{const d=await getDoc(doc(db,'fortune_stats','global'));return d.exists()?(d.data().total||0):0;}catch{return parseInt(localStorage.getItem('ft')||'0');}}
+async function incTotal(){
+  try{
+    await setDoc(doc(db,'fortune_stats','global'),{total:increment(1)},{merge:true});
+    console.log('✓ Total incremented in Firebase');
+  }catch(e){console.error('✗ incTotal failed:',e.code,e.message);}
+  const n=parseInt(localStorage.getItem('ft')||'0')+1;
+  localStorage.setItem('ft',n);return n;
+}
+function saveChoice(qid,w){
+  setDoc(doc(db,'fortune_choices',qid),{[w]:increment(1)},{merge:true})
+    .then(()=>console.log('✓ Choice saved:',qid,w))
+    .catch(e=>console.error('✗ Choice save failed:',e));
+  const d=JSON.parse(localStorage.getItem('fc_'+qid)||'{"A":0,"B":0}');d[w]++;localStorage.setItem('fc_'+qid,JSON.stringify(d));
+}
+function saveOutcome(k){
+  setDoc(doc(db,'fortune_outcomes',k),{count:increment(1)},{merge:true})
+    .then(()=>console.log('✓ Outcome saved:',k))
+    .catch(e=>console.error('✗ Outcome failed:',e.code,e.message));
+}
+async function getStats(k){
+  try{
+    const[a,b]=await Promise.all([getDoc(doc(db,'fortune_outcomes',k)),getDoc(doc(db,'fortune_stats','global'))]);
+    return{total:b.exists()?(b.data().total||0):0,pct:Math.round((a.exists()?a.data().count||0:0)/(b.exists()?b.data().total||1:1)*100)};
+  }catch{return null;}
+}
+function saveSession(raw){
+  const qMap={
+    q1:  {q:'Does everything happen for a reason?', A:'Yes',B:'No'},
+    q2a: {q:'Future or past?',                      A:'Future',B:'Past'},
+    q2b: {q:'See or feel?',                         A:'Feel',B:'See'},
+    q3a: {q:'Analogue or digital?',                 A:'Analogue',B:'Digital'},
+    q3b: {q:'Is ignorance bliss? (past)',            A:'Yes',B:'No'},
+    q3c: {q:'Every language or talk to animals?',   A:'Talk to animals',B:'Speak every language'},
+    q3d: {q:'Entertain or be entertained?',         A:'Entertain',B:'Be entertained'},
+    q4a: {q:'Is ignorance bliss? (future/analogue)',A:'Yes',B:'No'},
+    q4b: {q:'Prison or homeless?',                  A:'Prison',B:'Homeless'},
+    q4c: {q:'Born with or without technology?',     A:'With technology',B:'Without technology'},
+  };
+  const answers={};
+  Object.entries(raw.choices).forEach(([qid,ans])=>{
+    if(qMap[qid]&&ans) answers[qMap[qid].q]=ans==='A'?qMap[qid].A:qMap[qid].B;
+  });
+  const data={
+    session_number:    raw.sessionNum,
+    fortune_received:  raw.key,
+    decision_path:     raw.path,
+    answers,
+    timestamp:         serverTimestamp()
+  };
+  addDoc(collection(db,'fortune_sessions'),data)
+    .then(ref=>console.log('✓ Session saved:',ref.id,'\n',JSON.stringify({...data,timestamp:'now'},null,2)))
+    .catch(e=>console.error('✗ Session FAILED:',e.code,e.message));
+}
+
+const TREE={
+  q1: {text:'Does everything happen for a reason?',
+       A:'Yes', B:'No',
+       nextA:'q2a', nextB:'q2b'},
+
+  q2a:{text:'Would you rather live in the future or the past?',
+       A:'Future', B:'Past',
+       nextA:'q3a', nextB:'q3b'},
+
+  q3a:{text:'Would you rather live in an analogue or digital world?',
+       A:'Analogue', B:'Digital',
+       nextA:'q4a', fortuneB:'c3'},
+
+  q4a:{text:'Is ignorance bliss?',
+       A:'Yes', B:'No',
+       fortuneA:'flow', fortuneB:'trust'},
+
+  q3b:{text:'Is ignorance bliss?',
+       A:'Yes', B:'No',
+       fortuneA:'flow', fortuneB:'trust'},
+
+  q2b:{text:'Would you rather see or feel?',
+       A:'Feel', B:'See',
+       nextA:'q3c', nextB:'q3d'},
+
+  q3c:{text:'Would you rather speak every language or talk to animals?',
+       A:'Talk to animals', B:'Speak every language',
+       fortuneA:'bottle', fortuneB:'cards'},
+
+  q3d:{text:'Would you rather entertain or be entertained?',
+       A:'Entertain', B:'Be entertained',
+       nextA:'q4b', nextB:'q4c'},
+
+  q4b:{text:'Would you rather go to prison or be homeless?',
+       A:'Prison', B:'Homeless',
+       fortuneA:'good', fortuneB:'cycle'},
+
+  q4c:{text:'Would you rather be born with or without technology?',
+       A:'With technology', B:'Without technology',
+       fortuneA:'process', fortuneB:'lemon'}
+};
+const FORTUNES={
+  c3:      {img:'images/Musicc3.jpg'},   // Digital → C3 Algorave
+  flow:    {img:'images/flow.jpg'},       // Ignorance bliss Yes → Go with the flow
+  trust:   {img:'images/Gut.jpg'},        // Ignorance bliss No → Trust your gut
+  bottle:  {img:'images/dontbottle.jpg'}, // Animals → Don't bottle
+  cards:   {img:'images/cardsdealt.jpg'}, // Every language → Cards you were dealt
+  good:    {img:'images/wait.jpg'},       // Prison → Good comes to those who wait
+  cycle:   {img:'images/breakcycle.jpg'}, // Homeless → Break the cycle
+  process: {img:'images/process.jpg'},    // With tech → Trust the process
+  lemon:   {img:'images/Lemon.jpg'}       // Without tech → When life gives you lemon
+};
+
+// preload
+[...Object.values(FORTUNES).map(f=>f.img),
+ 'images/cookie1.jpg','images/cookie2.jpg','images/cookie3.jpg','images/cookie4.jpg',
+ 'images/intro_enter.jpg'
+].forEach(s=>{new Image().src=s;});
+
+let stack=[],choices={},fortune=null,sessNum=0,active=null,restartT=null;
+const cid=()=>stack[stack.length-1];
+
+function goTo(id){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  // only auto-restart from fortune page
+  if(id!=='p-fortune'){clearTimeout(restartT);}
+}
+
+function renderQ(){
+  const stage=document.getElementById('qstage');
+  document.getElementById('qbk').classList.toggle('hidden',stack.length<=1);
+  const qid=cid();const q=TREE[qid];
+
+  function show(){
+    const f=document.createElement('div');
+    f.className='q-frame enter';
+    const step=stack.length;
+    const total=Object.keys(TREE).length;
+    f.innerHTML=`
+      <div class="q-label">Question ${step} of ${Math.min(step+2,4)}</div>
+      <div class="q-q">${q.text.replace(/\n/g,'<br>')}</div>
+      <div class="q-divider"></div>
+      <div class="q-binary">
+        <div class="q-opt q-opt-a" id="oA" data-letter="A"><div class="q-opt-l">${q.A}</div></div>
+        <div class="q-opt q-opt-b" id="oB" data-letter="B"><div class="q-opt-l">${q.B}</div></div>
+      </div>`;
+    stage.appendChild(f);active=f;
+    f.querySelector('#oA').addEventListener('click',()=>pick(qid,'A',f));
+    f.querySelector('#oB').addEventListener('click',()=>pick(qid,'B',f));
+    if(choices[qid])applysel(f,choices[qid]);
+  }
+
+  if(active){
+    const old=active;active=null;
+    old.classList.remove('enter');old.classList.add('exit');
+    setTimeout(()=>{old.remove();show();},300);
+  } else show();
+}
+
+function pick(qid,w,frame){
+  frame.querySelectorAll('.q-opt').forEach(b=>b.classList.add('locked'));
+  choices[qid]=w;applysel(frame,w);
+  try{saveChoice(qid,w);}catch(e){}
+  setTimeout(()=>advance(qid,w),500);
+}
+function applysel(frame,w){
+  const a=frame.querySelector('#oA');
+  const b=frame.querySelector('#oB');
+  a.classList.remove('sel-r','sel-w');
+  b.classList.remove('sel-r','sel-w');
+  if(w==='A'){a.classList.add('sel-r');}
+  if(w==='B'){b.classList.add('sel-w');}
+}
+function advance(qid,w){
+  const q=TREE[qid];
+  const fk=w==='A'?q.fortuneA:q.fortuneB;
+  const nx=w==='A'?q.nextA:q.nextB;
+  if(fk){fortune=FORTUNES[fk];fortune._key=fk;crackCookie();}
+  else if(nx){stack.push(nx);renderQ();}
+}
+
+document.getElementById('qbk').addEventListener('click',()=>{
+  if(stack.length>1){const p=stack.pop();delete choices[p];renderQ();}
+});
+
+function crackCookie(){
+  goTo('p-cookie');
+  const img=document.getElementById('c-img');
+  img.src='images/cookie1.jpg';
+  // faster cycle + extra loop
+  setTimeout(()=>{ img.src='images/cookie2.jpg'; },500);
+  setTimeout(()=>{ img.src='images/cookie3.jpg'; },1000);
+  setTimeout(()=>{ img.src='images/cookie4.jpg'; },1500);
+  setTimeout(()=>{ img.src='images/cookie3.jpg'; },2000); // loop back
+  setTimeout(()=>{ img.src='images/cookie4.jpg'; },2500);
+  setTimeout(()=>{ img.src='images/cookie2.jpg'; },3000); // one more
+  setTimeout(()=>{ img.src='images/cookie4.jpg'; },3500);
+  setTimeout(showFortune, 4200); // always fires
+}
+
+async function showFortune(){
+  if(!fortune)fortune=FORTUNES['trust'];
+  saveSession({
+    sessionNum:sessNum,key:fortune._key,
+    path:stack.map(q=>`${q}:${choices[q]||'?'}`).join(' → '),
+    choices:Object.fromEntries(stack.map(q=>[q,choices[q]||null]))
+  });
+  saveOutcome(fortune._key||'trust');
+
+  document.getElementById('f-total').innerHTML='';
+  document.getElementById('f-pct').innerHTML='';
+  document.getElementById('f-num').textContent='No. '+String(sessNum).padStart(4,'0');
+
+  const img=document.getElementById('f-img');
+  img.classList.remove('on');
+  img.src=fortune.img;
+  if(img.complete&&img.naturalHeight)img.classList.add('on');
+  else img.onload=()=>img.classList.add('on');
+
+  goTo('p-fortune');
+
+  clearTimeout(restartT);
+  restartT=setTimeout(()=>{
+    // Full clean slate
+    stack=['q1'];choices={};fortune=null;active=null;
+    // Clear question stage
+    const stage=document.getElementById('qstage');
+    if(stage){stage.innerHTML='';}
+    // Reset top image
+    document.getElementById('f-total').innerHTML='';
+    document.getElementById('f-pct').innerHTML='';
+    document.getElementById('f-img').classList.remove('on');
+    goTo('p0');
+    console.log('↩ Auto-restarted');
+  },40000);
+
+  const s=await getStats(fortune._key||'trust');
+  if(s){
+    document.getElementById('f-total').innerHTML=`<b>${s.total}</b> people have received wishes`;
+    document.getElementById('f-pct').innerHTML=`You are part of the <b>${s.pct}%</b> who received this fortune`;
+  }
+}
+
+document.getElementById('btn-enter').addEventListener('click',async()=>{
+  sessNum=await incTotal();
+  stack=['q1'];choices={};fortune=null;active=null;
+  clearTimeout(restartT);
+  // Clear any leftover state
+  const stage=document.getElementById('qstage');
+  if(stage) stage.innerHTML='';
+  document.getElementById('f-total').innerHTML='';
+  document.getElementById('f-pct').innerHTML='';
+  document.getElementById('f-img').classList.remove('on');
+  goTo('p2');renderQ();
+});
+</script>
+</body>
+</html>
